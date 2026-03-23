@@ -65,7 +65,7 @@ stress_test = st.sidebar.checkbox("Activate Bear Market Stress Test?", value=Fal
 # 2. Get Data
 data = yf.download(symbol, period="5y")['Close']
 returns = np.log(data / data.shift(1)).dropna()
-current_price = data.iloc[-1]
+current_price = float(np.array(data.iloc[-1]).item()) 
 # 3. Logic: Run Simulation when button is clicked
 if st.button("Run Simulation"):
     
