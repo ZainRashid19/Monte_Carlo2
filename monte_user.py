@@ -158,7 +158,7 @@ if run_btn:
             # Left: Paths
             ax[0].set_facecolor('#050505')
             ax[0].plot(paths[:, :100], alpha=0.1, color='#00ffff')
-            ax[0].plot(paths[:,0], color="#39ff14", linewidth=1.5, label="Sample Path")
+            ax[0].plot(paths[:,0], color="#ff0000", linewidth=1.5, label="Sample Path")
             ax[0].set_title(f"PRICE TRAJECTORY ({title})", color='#ffb000')
             ax[0].grid(True, color='#333333', linestyle=':')
             
