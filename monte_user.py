@@ -57,8 +57,7 @@ def run_backtest_ui(returns, confidence_level=0.95):
     daily_vol = returns.std()
     var_cutoff_percent = daily_vol * z_score
 
-    actual_failures = returns[returns < -var_cutoff_percent]
-    num_failures = len(actual_failures)
+    num_failures = int((returns < -var_cutoff_percent).values.sum())
     total_days = len(returns)
     num_success = total_days - num_failures
 
@@ -115,9 +114,7 @@ with cmd_col3:
 # 4. MAIN EXECUTION LOGIC
 # ==========================================
 if run_btn:
-    num_simulations = 1000
-    position_size_usd = 10000
-    
+    num_simulations = 1000    
     with st.spinner(f"FETCHING DATA AND RUNNING 2,000 PARALLEL UNIVERSES FOR {symbol}..."):
         
         # Fetch Data (with the Pandas Series fix)
