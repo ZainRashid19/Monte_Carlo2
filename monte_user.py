@@ -5,13 +5,53 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import t, norm, chi2
 
-# Page Config
+# ==========================================
+# 1. PAGE CONFIG & BLOOMBERG UI OVERRIDE
+# ==========================================
 st.set_page_config(page_title="Monte Carlo Risk Engine", layout="wide")
 
-st.title("Monte Carlo Risk Engine (Student's t)")
+st.markdown("""
+    <style>
+    /* Main background and font */
+    .stApp {
+        background-color: #050505;
+        color: #39ff14; /* Neon Green */
+        font-family: 'Courier New', Courier, monospace;
+    }
+    
+    /* Headers */
+    h1, h2, h3 {
+        color: #ffb000 !important; /* Bloomberg Amber */
+        text-transform: uppercase;
+        border-bottom: 1px solid #ffb000;
+        padding-bottom: 5px;
+    }
+    
+    /* Metrics / KPIs */
+    [data-testid="stMetricLabel"] {
+        color: #00ffff !important; /* Cyan for labels */
+        font-weight: bold;
+    }
+    [data-testid="stMetricValue"] {
+        color: #39ff14 !important; /* Neon Green for numbers */
+    }
+    
+    /* Alert Boxes (Kupiec Test) */
+    .stAlert {
+        background-color: #111111 !important;
+        border: 1px solid #39ff14;
+        color: #ffffff;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
+st.title("SYS >> MONTE CARLO RISK ENGINE [TERMINAL]")
+
+# ==========================================
+# 2. BACKTESTING FUNCTION
+# ==========================================
 def run_backtest_ui(returns, confidence_level=0.95):
-    st.subheader("Backtesting: Kupiec POF Test")
+    st.subheader(">> SYSTEM DIAGNOSTIC: KUPIEC POF TEST")
     
     z_score = norm.ppf(confidence_level)
     daily_vol = returns.std()
@@ -28,11 +68,10 @@ def run_backtest_ui(returns, confidence_level=0.95):
     actual_success_rate = 1 - actual_failure_rate
     expected_failures = total_days * expected_failure_rate
 
-    # Display clean metrics in 3 columns
     col1, col2, col3 = st.columns(3)
-    col1.metric("Days Observed", total_days)
-    col2.metric("Expected Exceptions", f"{expected_failures:.1f}")
-    col3.metric("Actual Exceptions", num_failures)
+    col1.metric("DAYS OBSERVED", total_days)
+    col2.metric("EXPECTED EXCEPTIONS", f"{expected_failures:.1f}")
+    col3.metric("ACTUAL EXCEPTIONS", num_failures)
 
     try: 
         if num_failures == 0:
@@ -44,7 +83,7 @@ def run_backtest_ui(returns, confidence_level=0.95):
         
         p_val = 1 - chi2.cdf(lr_stat, 1)
 
-        st.write(f"**P-Value:** {p_val:.3f}")
+        st.write(f"**P-VALUE:** {p_val:.3f}")
 
         if p_val > 0.05: 
             st.success("✅ PASS: The model is accurate. Failures are within the expected random range.")
@@ -57,31 +96,40 @@ def run_backtest_ui(returns, confidence_level=0.95):
     except Exception as e:
         st.error(f"Could not calculate Kupiec Test: {e}")
 
-# 1. Sidebar Inputs
-symbol = st.sidebar.text_input("Ticker Symbol", value="NDX")
-days_ahead = st.sidebar.slider("Days to Simulate", 30, 365, value=252)
-stress_test = st.sidebar.checkbox("Activate Bear Market Stress Test?", value=False)
+# ==========================================
+# 3. COMMAND INPUTS 
+# ==========================================
+st.subheader(">> INPUT PARAMETERS")
+cmd_col1, cmd_col2, cmd_col3 = st.columns(3)
 
-# 2. Get Data
-data = yf.download(symbol, period="5y")['Close']
-returns = np.log(data / data.shift(1)).dropna()
-current_price = float(np.array(data.iloc[-1]).item()) 
-# 3. Logic: Run Simulation when button is clicked
-if st.button("Run Simulation"):
-    
+with cmd_col1:
+    symbol = st.text_input("TICKER SYMBOL", value="NDX")
+with cmd_col2:
+    days_ahead = st.number_input("DAYS TO SIMULATE", min_value=30, max_value=365, value=252)
+with cmd_col3:
+    st.write("") 
+    st.write("")
+    run_btn = st.button("EXECUTE SIMULATION >>")
+
+# ==========================================
+# 4. MAIN EXECUTION LOGIC
+# ==========================================
+if run_btn:
     num_simulations = 1000
     position_size_usd = 10000
     
-    with st.spinner("Running 2,000 parallel universes (Base + Stress)..."):
+    with st.spinner(f"FETCHING DATA AND RUNNING 2,000 PARALLEL UNIVERSES FOR {symbol}..."):
         
-        # Fit the historical data once
+        # Fetch Data (with the Pandas Series fix)
+        data = yf.download(symbol, period="5y")['Close']
+        returns = np.log(data / data.shift(1)).dropna()
+        current_price = float(np.array(data.iloc[-1]).item())
+        
         params = t.fit(returns)
         
-        # ==========================================
-        # MODEL 1: BASE CASE (MLE)
-        # ==========================================
+        # --- MODEL 1: BASE CASE (MLE) ---
         df_base, loc_base, scale_base = params 
-        if df_base < 3: df_base = 3 # Safety cap
+        if df_base < 3: df_base = 3 
             
         sim_base = t.rvs(df_base, loc=loc_base, scale=scale_base, size=(days_ahead, num_simulations))
         paths_base = current_price * np.exp(np.cumsum(sim_base, axis=0))
@@ -90,12 +138,10 @@ if st.button("Run Simulation"):
         pnl_base = ((paths_base[-1] / current_price) * position_size_usd) - position_size_usd
         var_base = np.sort(pnl_base)[int(num_simulations * 0.05)]
 
-        # ==========================================
-        # MODEL 2: STRESS TEST (Bear Market)
-        # ==========================================
+        # --- MODEL 2: STRESS TEST (Bear Market) ---
         df_stress = 5 
-        loc_stress = -0.001             # Forced negative drift
-        scale_stress = params[2] * 1.5  # Forced high volatility
+        loc_stress = -0.001            
+        scale_stress = params[2] * 1.5 
         
         sim_stress = t.rvs(df_stress, loc=loc_stress, scale=scale_stress, size=(days_ahead, num_simulations))
         paths_stress = current_price * np.exp(np.cumsum(sim_stress, axis=0))
@@ -104,46 +150,44 @@ if st.button("Run Simulation"):
         pnl_stress = ((paths_stress[-1] / current_price) * position_size_usd) - position_size_usd
         var_stress = np.sort(pnl_stress)[int(num_simulations * 0.05)]
 
-        # ==========================================
-        # PLOTTING HELPER FUNCTION
-        # ==========================================
-        # We write this so we don't have to type the graph code twice!
+        # --- PLOTTING HELPER FUNCTION (DARK MODE) ---
         def create_plots(paths, pnl, var, title):
-            fig, ax = plt.subplots(1, 2, figsize=(15, 6))
+            plt.style.use('dark_background')
+            fig, ax = plt.subplots(1, 2, figsize=(15, 6), facecolor='#050505')
             
             # Left: Paths
-            ax[0].plot(paths[:, :100], alpha=0.1, color='blue')
-            ax[0].plot(paths[:,0], color="black", linewidth=1, label="Sample Path")
-            ax[0].set_title(f"Monte Carlo Paths ({title})")
-            ax[0].grid(True, alpha=0.3)
+            ax[0].set_facecolor('#050505')
+            ax[0].plot(paths[:, :100], alpha=0.1, color='#00ffff')
+            ax[0].plot(paths[:,0], color="#39ff14", linewidth=1.5, label="Sample Path")
+            ax[0].set_title(f"PRICE TRAJECTORY ({title})", color='#ffb000')
+            ax[0].grid(True, color='#333333', linestyle=':')
             
             # Right: Histogram
-            ax[1].hist(pnl + position_size_usd, bins=50, color='skyblue', edgecolor='black', alpha=0.7)
-            ax[1].axvline(x=position_size_usd, color='green', linewidth=1, label='Break Even')
-            ax[1].axvline(x=position_size_usd + var, color='red', linestyle='--', linewidth=2, label=f"VaR 95%: ${var:,.0f}")
-            ax[1].set_title(f"Terminal Wealth ({title})")
-            ax[1].set_ylabel("Number of Simulations")
-            ax[1].legend()
-            ax[1].grid(True, alpha=0.3)
+            ax[1].set_facecolor('#050505')
+            ax[1].hist(pnl + position_size_usd, bins=50, color='#0055ff', edgecolor='#00aaff', alpha=0.7)
+            ax[1].axvline(x=position_size_usd, color='#39ff14', linewidth=2, label='BREAK EVEN')
+            ax[1].axvline(x=position_size_usd + var, color='#ff003c', linestyle='--', linewidth=2, label=f"VaR 95%: ${var:,.0f}")
+            ax[1].set_title(f"TERMINAL WEALTH DIST ({title})", color='#ffb000')
+            ax[1].legend(facecolor='#111111', edgecolor='#ffb000', labelcolor='white')
+            ax[1].grid(True, color='#333333', linestyle=':')
             
             return fig
 
-        # ==========================================
-        # STREAMLIT UI RENDER (TABS)
-        # ==========================================
-        tab1, tab2 = st.tabs(["📈 Base Case (Historical)", "📉 Stress Test (Bear Market)"])
+        # --- UI RENDER (TABS) ---
+        st.write("") # Spacing
+        tab1, tab2 = st.tabs(["📈 BASE CASE (HISTORICAL)", "📉 STRESS TEST (BEAR MARKET)"])
         
         with tab1:
-            st.subheader("Scenario 1: Historical Market Fit")
-            st.pyplot(create_plots(paths_base, pnl_base, var_base, "Base Case"))
-            st.metric("Projected VaR (95%)", f"${var_base:,.2f}")
+            st.subheader(">> SCENARIO 1: HISTORICAL MARKET FIT")
+            st.pyplot(create_plots(paths_base, pnl_base, var_base, "BASE CASE"))
+            st.metric("PROJECTED VaR (95%)", f"${var_base:,.2f}")
             
         with tab2:
-            st.subheader("Scenario 2: Simulated Recession")
-            st.info("Assumes a -25% annualized downward drift and a 50% spike in volatility.")
-            st.pyplot(create_plots(paths_stress, pnl_stress, var_stress, "Stress Test"))
-            st.metric("Stress Test VaR (95%)", f"${var_stress:,.2f}")
+            st.subheader(">> SCENARIO 2: SIMULATED RECESSION")
+            st.info("SYSTEM ASSUMES A -25% ANNUALIZED DOWNWARD DRIFT AND A 50% SPIKE IN VOLATILITY.")
+            st.pyplot(create_plots(paths_stress, pnl_stress, var_stress, "STRESS TEST"))
+            st.metric("STRESS TEST VaR (95%)", f"${var_stress:,.2f}")
 
-        # Run the Backtest below everything
+        # --- BACKTEST RENDER ---
         st.divider() 
         run_backtest_ui(returns)
