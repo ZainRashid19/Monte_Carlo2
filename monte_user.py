@@ -106,9 +106,12 @@ with cmd_col1:
 with cmd_col2:
     days_ahead = st.number_input("DAYS TO SIMULATE", min_value=30, max_value=365, value=252)
 with cmd_col3:
-    st.write("") 
-    st.write("")
-    run_btn = st.button("EXECUTE SIMULATION >>")
+    # THIS IS THE FIX: We define position_size_usd right here in the UI
+    position_size_usd = st.number_input("POSITION SIZE ($)", min_value=100, max_value=1000000, value=10000, step=1000)
+
+st.write("") 
+# This makes the button span the entire width below the 3 inputs
+run_btn = st.button("EXECUTE SIMULATION >>", use_container_width=True)
 
 # ==========================================
 # 4. MAIN EXECUTION LOGIC
